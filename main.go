@@ -19,18 +19,25 @@ type JsonInput struct {
 }
 
 func main() {
-	var engAlphabet [26]rune
 
+	//Формируем алфавит
+	var engAlphabet [26]rune
 	for i := 0; i < len(engAlphabet); i++ {
 		engAlphabet[i] = 'a' + rune(i)
 	}
 
+	/*
+		Проводим замешивание алфавита
+		Необходимо для формирования
+		Случайной матрицы Полибоя
+	*/
 	randomizer := rand.New(rand.NewSource(time.Now().UnixNano()))
-
 	randomizer.Shuffle(len(engAlphabet), func(i, j int) {
 		engAlphabet[i], engAlphabet[j] = engAlphabet[j], engAlphabet[i]
 	})
 
+	//Формируем матрицу полибоя
+	fmt.Print("Матрица Полибоя")
 	polyboyMatrix := make(map[rune]IntPair)
 	for i := 0; i < 6; i++ {
 		fmt.Println("")
@@ -47,6 +54,7 @@ func main() {
 		}
 	}
 
+	//Считываем текст, который необходимо закодировать
 	jsonFile, err := os.ReadFile("data.json")
 	if err != nil {
 		fmt.Println(err)
@@ -62,8 +70,9 @@ func main() {
 
 	toEncode := jsonInput.ToEncodeString
 	encodedData := make([]string, len(toEncode))
+	fmt.Printf("Текст для кодирования: %s\n", toEncode)
 
-	fmt.Printf("%s\n", toEncode)
+	//Производим кодирование текста
 	for i, c := range toEncode {
 		pair, isFound := polyboyMatrix[unicode.ToLower(c)]
 		if isFound {
@@ -77,12 +86,13 @@ func main() {
 		}
 	}
 
-	fmt.Printf("[")
+	fmt.Printf("Закодированный текст: [")
 	for _, c := range encodedData {
 		fmt.Printf("%s,", c)
 	}
 	fmt.Printf("]\n")
 
+	//Производим декодирование текста
 	decodedData := ""
 	for _, s := range encodedData {
 		if len(s) == 3 {
@@ -102,12 +112,10 @@ func main() {
 
 				}
 			}
-
 		} else {
 			decodedData += s
 		}
 	}
 
-	fmt.Println(decodedData)
-
+	fmt.Printf("Декодированный текст: %s\n", decodedData)
 }
