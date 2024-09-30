@@ -1,121 +1,84 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"math/rand"
 	"os"
 	"time"
-	"unicode"
 )
 
 type IntPair struct {
-	First  int
-	Second int
+	i int
+	j int
 }
 
-type JsonInput struct {
-	ToEncodeString string `json:"toEncode"`
+func getGreenText(input string) string {
+	return fmt.Sprintf("\033[32m%s\033[0m", input)
+}
+
+func getRedText(input string) string {
+	return fmt.Sprintf("\033[31m%s\033[0m\n", input)
 }
 
 func main() {
 
-	//Формируем алфавит
-	var engAlphabet [26]rune
-	for i := 0; i < len(engAlphabet); i++ {
-		engAlphabet[i] = 'a' + rune(i)
+	//Считываем текст, который необходимо закодировать
+	data, err := os.ReadFile("data.txt")
+	if err != nil {
+		fmt.Printf(getRedText("Ошибка при чтении файла: %s"), err)
+		return
 	}
+	toEncode := string(data)
 
+	fmt.Printf("Данные для кодирования: \n%s\n", getGreenText(toEncode))
+
+	//Формируем алфавит
+	alphabet := GetAlphabet(toEncode)
 	/*
 		Проводим замешивание алфавита
 		Необходимо для формирования
 		Случайной матрицы Полибоя
 	*/
 	randomizer := rand.New(rand.NewSource(time.Now().UnixNano()))
-	randomizer.Shuffle(len(engAlphabet), func(i, j int) {
-		engAlphabet[i], engAlphabet[j] = engAlphabet[j], engAlphabet[i]
+	randomizer.Shuffle(len(alphabet), func(i, j int) {
+		alphabet[i], alphabet[j] = alphabet[j], alphabet[i]
 	})
 
 	//Формируем матрицу полибоя
-	fmt.Print("Матрица Полибоя")
-	polyboyMatrix := make(map[rune]IntPair)
-	for i := 0; i < 6; i++ {
-		fmt.Println("")
-		for j := 0; j < 6; j++ {
-			if 6*i+j < len(engAlphabet) {
-				polyboyMatrix[engAlphabet[6*i+j]] = IntPair{
-					First:  i,
-					Second: j,
-				}
-				fmt.Printf("(%d,%d)=%c ", i, j, engAlphabet[6*i+j])
-			} else {
-				break
-			}
-		}
-	}
+	polyboyMatrix := GetPolyBoy(alphabet)
 
-	//Считываем текст, который необходимо закодировать
-	jsonFile, err := os.ReadFile("data.json")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+	fmt.Printf("\nСгенерированная матрица полибоя \n%s\n", getGreenText(PolyBoyAsString(polyboyMatrix)))
 
-	var jsonInput JsonInput
-	err = json.Unmarshal(jsonFile, &jsonInput)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	toEncode := jsonInput.ToEncodeString
-	encodedData := make([]string, len(toEncode))
-	fmt.Printf("Текст для кодирования: %s\n", toEncode)
-
+	encodedData := make([]IntPair, 0)
 	//Производим кодирование текста
-	for i, c := range toEncode {
-		pair, isFound := polyboyMatrix[unicode.ToLower(c)]
-		if isFound {
-			if unicode.IsUpper(c) {
-				encodedData[i] = fmt.Sprintf("%d%d%c", pair.First, pair.Second, 'u')
-			} else {
-				encodedData[i] = fmt.Sprintf("%d%d%c", pair.First, pair.Second, 'l')
-			}
-		} else {
-			encodedData[i] = string(c)
+	for _, letter := range toEncode {
+		i, j, ok := GetPosition(letter, polyboyMatrix)
+		if !ok {
+			fmt.Println(fmt.Errorf("(%c) нет в матрице %s", letter, getRedText(PolyBoyAsString(polyboyMatrix))))
+			return
 		}
+		encodedData = append(encodedData, IntPair{i, j})
 	}
 
-	fmt.Printf("Закодированный текст: [")
-	for _, c := range encodedData {
-		fmt.Printf("%s,", c)
-	}
-	fmt.Printf("]\n")
+	fmt.Printf("Закодированные данные: \n%v\n", encodedData)
 
 	//Производим декодирование текста
 	decodedData := ""
-	for _, s := range encodedData {
-		if len(s) == 3 {
-			pairToFind := IntPair{
-				First:  int(s[0] - '0'),
-				Second: int(s[1] - '0'),
-			}
-
-			for letter := range polyboyMatrix {
-				pair := polyboyMatrix[letter]
-				if pair == pairToFind {
-					if s[2] == 'u' {
-						decodedData += string(unicode.ToUpper(letter))
-					} else {
-						decodedData += string(unicode.ToLower(letter))
-					}
-
-				}
-			}
-		} else {
-			decodedData += s
+	for _, pair := range encodedData {
+		letter, ok := GetLetter(uint(pair.i), uint(pair.j), polyboyMatrix)
+		if !ok {
+			fmt.Println(fmt.Errorf("%c нет в матрице \n%v", letter, getRedText(PolyBoyAsString(polyboyMatrix))))
+			return
 		}
+		decodedData += string(letter)
 	}
 
-	fmt.Printf("Декодированный текст: %s\n", decodedData)
+	fmt.Printf("\nДекодированные данные: \n%s\n\n", getGreenText(decodedData))
+
+	if toEncode == decodedData {
+		fmt.Println("Исходные и выходные данные равны")
+	} else {
+		fmt.Println("Данные не сходятся")
+	}
+
 }
